@@ -1,0 +1,71 @@
+Table "location" {
+  "id" bigint [pk, increment]
+  "name" text [not null]
+  "address" text [unique, not null]
+  "start_time" time [not null]
+  "end_time" time [not null]
+
+  Checks {
+    `end_time > start_time` [name: 'check_location_work_time']
+  }
+}
+
+Table "manager" {
+  "id" bigint [pk, increment]
+  "name" text [not null]
+  "email" text [unique, not null, check: `email LIKE '%@%.%'`]
+  "phone" text [unique, not null, check: `phone ~ '^\+[1-9]\d{1,14}$'`]
+  "location_id" bigint [not null]
+}
+
+Table "room" {
+  "id" bigint [pk, increment]
+  "name" text [not null]
+  "capacity" int [not null, check: `capacity >= 0`, default: 0]
+  "price_per_hour" numeric(10,2) [not null, check: `price_per_hour >= 0`, default: 0.00]
+  "location_id" bigint [not null]
+
+  Indexes {
+    (name, location_id) [unique, name: "unique_room_at_location"]
+  }
+}
+
+Table "client" {
+  "id" bigint [pk, increment]
+  "name" text [not null]
+  "email" text [unique, not null, check: `email LIKE '%@%.%'`]
+  "phone" text [unique, not null, check: `phone ~ '^\+[1-9]\d{1,14}$'`]
+  "discount" numeric(3,2) [not null, check: `0.00 <= discount AND discount <= 0.50`, default: 0.00]
+  "favorite_location" bigint
+}
+
+Table "booking" {
+  "id" bigint [pk, increment]
+  "booked_seats" integer [not null, check: `booked_seats > 0`]
+  "start_time" timestamptz [not null]
+  "end_time" timestamptz [not null]
+  "price" numeric(10,2) [not null, check: `price >= 0`, default: 0]
+  "client_id" bigint [not null]
+  "room_id" bigint [not null]
+  "manager_id" bigint
+
+  Checks {
+    `end_time > start_time` [name: 'check_booking_time']
+  }
+
+  Indexes {
+    (start_time, end_time, room_id) [unique, name: "unique_booking_time_at_room"]
+  }
+}
+
+Ref:"location"."id" <? "manager"."location_id" [delete: restrict]
+
+Ref:"location"."id" <? "room"."location_id" [delete: cascade]
+
+Ref:"location"."id" ?<? "client"."favorite_location" [delete: set null]
+
+Ref:"client"."id" <? "booking"."client_id" [delete: cascade]
+
+Ref:"room"."id" <? "booking"."room_id" [delete: restrict]
+
+Ref:"manager"."id" ?<? "booking"."manager_id" [delete: set null]
