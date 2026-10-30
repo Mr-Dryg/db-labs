@@ -40,7 +40,6 @@ CREATE TABLE booking (
     booked_seats integer NOT NULL CHECK (booked_seats > 0),
     start_time timestamptz NOT NULL,
     end_time timestamptz NOT NULL,
-    price numeric(10, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
     client_id bigint NOT NULL REFERENCES client(id) ON DELETE CASCADE,
     room_id bigint NOT NULL REFERENCES room(id) ON DELETE RESTRICT,
     manager_id bigint REFERENCES manager(id) ON DELETE SET NULL,

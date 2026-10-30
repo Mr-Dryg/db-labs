@@ -8,19 +8,21 @@ CREATE TABLE booking_change (
     end_time timestamptz NOT NULL,
     created_at timestamptz NOT NULL DEFAULT NOW(),
     reason TEXT,
-    price numeric(10, 2) NOT NULL DEFAULT 0 CHECK (price >= 0),
 
     CONSTRAINT unique_active_booking_change UNIQUE(booking_id, created_at)
 );
 
-INSERT INTO booking_change (booking_id, room_id, start_time, end_time, price)
-    SELECT id, room_id, start_time, end_time, price
+INSERT INTO booking_change (booking_id, room_id, start_time, end_time)
+    SELECT id, room_id, start_time, end_time
     FROM booking;
 
 ALTER TABLE booking
     DROP COLUMN start_time,
     DROP COLUMN end_time,
-    DROP COLUMN price,
     DROP COLUMN room_id;
+
+ALTER TABLE booking
+  ADD COLUMN status text NOT NULL DEFAULT 'created'
+  CHECK (status IN ('created', 'confirmed', 'completed', 'cancelled'));
 
 COMMIT;
