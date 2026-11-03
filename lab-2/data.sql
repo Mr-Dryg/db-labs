@@ -160,3 +160,41 @@ SELECT setval(pg_get_serial_sequence('booking','id'),        (SELECT MAX(id) FRO
 SELECT setval(pg_get_serial_sequence('booking_change','id'), (SELECT MAX(id) FROM booking_change));
 
 COMMIT;
+
+
+WITH actual_booking_change AS (
+    SELECT booking_id, room_id, start_time, end_time
+    FROM (
+        SELECT booking_id, room_id, start_time, end_time,
+               ROW_NUMBER() OVER (PARTITION BY booking_id
+                                  ORDER BY created_at DESC, id DESC) AS rn
+        FROM booking_change
+    )
+    WHERE rn = 1
+), monthly AS (
+    SELECT r.location_id,
+           DATE_TRUNC('month', bc.start_time) AS month,
+           COUNT(*) AS completed_bookings,
+           SUM(EXTRACT(EPOCH FROM (bc.end_time - bc.start_time)) / 3600
+               * r.price_per_hour * (1 - c.discount)) AS income
+    FROM actual_booking_change bc
+    JOIN booking b ON b.id = bc.booking_id
+    JOIN client c  ON c.id = b.client_id
+    JOIN room r    ON r.id = bc.room_id
+    WHERE b.status = 'completed'
+    GROUP BY r.location_id, DATE_TRUNC('month', bc.start_time)
+)
+SELECT TO_CHAR(m.month, 'YYYY-MM') AS year_month,
+       l.name AS location,
+       m.completed_bookings,
+       ROUND(m.income, 2) AS income,
+       ROUND(SUM(m.income) OVER w, 2) AS cumulative_income,
+       SUM(m.completed_bookings) OVER w AS cumulative_bookings,
+       ROUND(100 * SUM(m.income) OVER w
+             / SUM(m.income) OVER (PARTITION BY m.location_id), 1) AS cumulative_share_pct
+FROM monthly m
+JOIN location l ON l.id = m.location_id
+WINDOW w AS (PARTITION BY m.location_id
+             ORDER BY m.month
+             ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+ORDER BY l.name, m.month;
